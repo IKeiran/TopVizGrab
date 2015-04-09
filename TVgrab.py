@@ -81,7 +81,7 @@ def save_project(project):
         out_file.write(json.dumps(project, lambda x: x.__dict__, indent=2))
 
 
-def get_group_statistic():
+def get_group_statistic(d_list):
     global wd
     # Получение списка ключей
     k_list = get_info_list('div.tag0.middle')
@@ -94,11 +94,9 @@ def get_group_statistic():
         else:
             page_count = 1
     # получение дат
-    d_list =get_info_list('td>span.date')
-    print('Список дат %s' % d_list)
     table = wd.find_element_by_id('dynamics_table')
     row = table.find_elements_by_css_selector('div.cols>table>tbody>tr')
-    kw = {}
+    keyword_statisic = {}
     for k_index in range(len(k_list)):
         date_pos = {}
         for d_index in range(len(d_list)):
@@ -107,22 +105,24 @@ def get_group_statistic():
             except:
                 pos = '-'
             date_pos[d_list[d_index]] = pos
-        kw[k_list[k_index]]=date_pos
-    print('позиции по датам: %s ' %kw)
-    return kw
+        keyword_statisic[k_list[k_index]] = date_pos
+    return keyword_statisic
+
 
 def get_region_statistic():
     g_list = get_combobox_options('group_id')[1:]
     groups = {}
     print('Найдено групп %d' % len(g_list))
+    d_list = get_info_list('td>span.date')
+    print('Список дат %s' % d_list)
     for g_num in range(len(g_list)):
         print('Выбор группы %s' % g_list[g_num])
         Select(wd.find_element_by_name("group_id")).select_by_index(g_num+1)
         sleep(5)
         print('Получение статистики группы')
-        kw = get_group_statistic()
-        print('Гет регион статистик: %s' % kw)
-        groups[g_list[g_num]]=kw
+        k_w = get_group_statistic(d_list)
+        print('Гет регион статистик: %s' % k_w)
+        groups[g_list[g_num]]=k_w
     return groups
 
 
@@ -157,14 +157,24 @@ def get_se_statistic(region = None):
     return regions
 
 
+def set_dates():
+    from selenium.webdriver.common.keys import Keys
+    from selenium.webdriver import ActionChains
+    global wd
+    w = wd
+    wd.find_element_by_css_selector(".dates_text").click()
+    wd.find_element_by_name('date1').click()
+    wd.find_element_by_name('date1').clear()
+    send_keys('date1', '01.01.2013')
+    wd.find_element_by_css_selector(".btn.go").click()
+
+
 def get_project_statistic(project):
-    count = 0
     wd.get(project.tv_url)
-    project = Project()
     all = {}
     se_stat = {}
     se_list = get_combobox_options("searcher")[:-2]
-    print(se_list)
+    set_dates()
     SE_FULL = ('Yandex', 'Google', 'go.Mail')
     SE_SHORT = ('Google.com', 'Yandex.com')
     reg_num = 0
@@ -173,7 +183,9 @@ def get_project_statistic(project):
             if se_list[index] in SE_FULL:
                 Select(wd.find_element_by_name("searcher")).select_by_index(index)
                 se_stat[se_list[index]] = get_se_statistic()
-            elif se_list[index] in SE_SHORT:
+            elif se_list[index] == 'Yandex.com':
+                se_stat[se_list[index]] = get_se_statistic('87')
+            elif se_list[index] == 'Google.com':
                 se_stat[se_list[index]] = get_se_statistic('87')
             all[se_list[index]] = se_stat[se_list[index]]
             reg_num+=1
@@ -182,7 +194,6 @@ def get_project_statistic(project):
     # получение позиций
 
 #    save_project(project)
-
 
 
 init_session()
