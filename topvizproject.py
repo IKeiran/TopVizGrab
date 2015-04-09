@@ -2,7 +2,7 @@ __author__ = 'vs'
 
 class Keyword():
     def __init__(self, kw = None, group = None, relpage = None, date = None, position = None):
-        self.group =group
+        self.group = group
         self.relpage = relpage
         self.stat = dict()
         self.add_date(date,position)

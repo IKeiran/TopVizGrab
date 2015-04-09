@@ -2,7 +2,7 @@ __author__ = 'Keiran'
 from selenium import webdriver
 from selenium.webdriver.support.ui import Select
 from time import sleep
-from topvizproject import Project, Keyword
+from topvizproject import Project
 
 user_login = "rafiq@list.ru"
 user_password = "ump.87uv"
@@ -52,58 +52,138 @@ def get_projects_data():
 
 def get_info_list(css_selector):
     global wd
+    sleep(1)
     keywords = wd.find_elements_by_css_selector(css_selector)
-    k_list = list ()
+    k_list = list()
     for keyword in keywords:
         k_list.append(keyword.text)
-    return  k_list
+        print(keyword.text)
+#    print('GIL end')
+    return k_list
+
+
+def get_combobox_options(cb_name):
+    global wd
+    result = list()
+    cb = wd.find_element_by_name(cb_name)
+    options = cb.find_elements_by_css_selector('option')
+    for option in options:
+        try:
+            result.append(option.text)
+        except:
+            pass
+    return result
+
+
+def save_project(project):
+    import json
+    with open('test.json', 'w') as out_file:
+        out_file.write(json.dumps(project, lambda x: x.__dict__, indent=2))
+
+
+def get_group_statistic():
+    global wd
+    # Получение списка ключей
+    k_list = get_info_list('div.tag0.middle')
+    print('Список ключей: %s' % k_list)
+    if len(k_list)>10:
+        Select(wd.find_element_by_name("limit")).select_by_index(6) # установка кол-ва ключей на страницу
+        sleep(5)
+        if len(k_list)>1000:
+            page_count = len(get_combobox_options('page'))
+        else:
+            page_count = 1
+    # получение дат
+    d_list =get_info_list('td>span.date')
+    print('Список дат %s' % d_list)
+    table = wd.find_element_by_id('dynamics_table')
+    row = table.find_elements_by_css_selector('div.cols>table>tbody>tr')
+    kw = {}
+    for k_index in range(len(k_list)):
+        date_pos = {}
+        for d_index in range(len(d_list)):
+            try:
+                pos = row[k_index+1].find_elements_by_css_selector('td')[d_index].find_element_by_css_selector('div>a').text
+            except:
+                pos = '-'
+            date_pos[d_list[d_index]] = pos
+        kw[k_list[k_index]]=date_pos
+    print('позиции по датам: %s ' %kw)
+    return kw
+
+def get_region_statistic():
+    g_list = get_combobox_options('group_id')[1:]
+    groups = {}
+    print('Найдено групп %d' % len(g_list))
+    for g_num in range(len(g_list)):
+        print('Выбор группы %s' % g_list[g_num])
+        Select(wd.find_element_by_name("group_id")).select_by_index(g_num+1)
+        sleep(5)
+        print('Получение статистики группы')
+        kw = get_group_statistic()
+        print('Гет регион статистик: %s' % kw)
+        groups[g_list[g_num]]=kw
+    return groups
+
+
+def get_region_ids():
+    global wd
+    result = list()
+    cb = wd.find_element_by_name('region_key')
+    options = cb.find_elements_by_css_selector('option')
+    for option in options:
+        try:
+            punkt = option.get_attribute("value")
+            colpos = punkt.find(':')
+            if colpos > 0 and punkt.find('-') == -1:
+                result.append(punkt[:colpos])
+        except:
+            pass
+    return result
+
+
+def get_se_statistic(region = None):
+    r_list = list()
+    if region is None:
+        r_list = get_region_ids()
+    else:
+        r_list.append(region)
+    regions = {}
+    for r_num in range(len(r_list)):
+        Select(wd.find_element_by_name("region_key")).select_by_index(r_num)
+        sleep(5)
+        kw = get_region_statistic()
+        regions[r_list[r_num]]=kw
+    return regions
 
 
 def get_project_statistic(project):
     count = 0
     wd.get(project.tv_url)
-    Select(wd.find_element_by_name("limit")).select_by_index(5)
-    sleep(5)
-    # получение списка ключевых фраз
-    k_list = get_info_list('div.tag0.middle')
-    print(k_list)
-    # получение дат
-    d_list =get_info_list('td>span.date')
-    print(d_list)
     project = Project()
+    all = {}
+    se_stat = {}
+    se_list = get_combobox_options("searcher")[:-2]
+    print(se_list)
+    SE_FULL = ('Yandex', 'Google', 'go.Mail')
+    SE_SHORT = ('Google.com', 'Yandex.com')
+    reg_num = 0
+    for index in range(len(se_list)):
+        if (se_list[index] in SE_FULL) or (se_list[index] in SE_SHORT):
+            if se_list[index] in SE_FULL:
+                Select(wd.find_element_by_name("searcher")).select_by_index(index)
+                se_stat[se_list[index]] = get_se_statistic()
+            elif se_list[index] in SE_SHORT:
+                se_stat[se_list[index]] = get_se_statistic('87')
+            all[se_list[index]] = se_stat[se_list[index]]
+            reg_num+=1
+    save_project(all)
+
     # получение позиций
-    table = wd.find_element_by_id('dynamics_table')
- #   row = table.find_elements_by_css_selector('div.cols>table>tbody>tr>td>div')
-    row = table.find_elements_by_css_selector('div.cols>table>tbody>tr')
-    for k_index in range(len(k_list)):
-        for d_index in range(len(d_list)):
-            try:
-                pos = row[k_index+1].find_elements_by_css_selector('td')[d_index].find_element_by_css_selector('div>a').text
 
-            except:
-                pos = '-'
-            kwrd = Keyword(group='', date=d_list[d_index],position=pos)
-            project.add_keyword(element=k_list[k_index], kwrd)
-            print('Keywords: %s; Date: %s; position: %s' % (k_list[k_index], d_list[d_index], pos))
-    print(project)
+#    save_project(project)
 
 
-
-
-
-"""
-    table = wd.find_element_by_id('dynamics_table')
-    rows = table.find_elements_by_css_selector('tr')
-    k_w = ()
-    for row in rows:
-        count += 1
-        cells = row.find_elements_by_css_selector('td')
-
-        print('')
-        print(keyword.text)
-  #      for c in cells:
-   #         print(str(count), c.text)
-"""
 
 init_session()
 login(user_login, user_password)
