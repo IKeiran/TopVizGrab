@@ -218,21 +218,20 @@ def save_project_list(project_list, file_name):
 
 init_session(debug=True)
 login(user_login, user_password)
-#try:
-projects = get_projects_data()
-file_name = 'project_list_%s' % user_login
-save_project_list(projects, file_name)
+try:
+    projects = get_projects_data()
+    file_name = 'project_list_%s' % user_login
+    save_project_list(projects, file_name)
 
-#    for num in range(len(projects)):
-project_statistic = dict()
-for num in projects:
-    get_project_statistic(projects[num], project_statistic)
+    #    for num in range(len(projects)):
+    project_statistic = dict()
+    for num in projects:
+        get_project_statistic(projects[num], project_statistic)
 
-file_name = user_login
-save_project(project=project_statistic, file_name=file_name)
+    file_name = user_login
+    save_project(project=project_statistic, file_name=file_name)
 
-# except:
-#     wd.save_screenshot('Error.png')
-# finally:
-#     pass
-    #wd.close()
+except:
+     wd.save_screenshot('Error.png')
+finally:
+    wd.close()
