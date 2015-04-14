@@ -1,18 +1,26 @@
 __author__ = 'Keiran'
 from selenium import webdriver
+from selenium.webdriver.common.desired_capabilities import DesiredCapabilities
 from selenium.webdriver.support.ui import Select
 from time import sleep
 from topvizproject import Project
+from selenium.webdriver.common.keys import Keys
 
 user_login = "rafiq@list.ru"
 user_password = "ump.87uv"
 base_url = 'https://topvisor.ru/projects/'
 
-
-def init_session():
+def init_session(debug=False):
     global wd
-    wd = webdriver.Firefox()
-    wd.maximize_window()
+    if debug:
+        wd = webdriver.Firefox()
+        wd.maximize_window()
+    else: # основной PhantomJS
+        dcap = dict(DesiredCapabilities.PHANTOMJS)
+        dcap["phantomjs.page.settings.userAgent"] = (
+           "Mozilla/5.0 (Windows NT 6.1; WOW64; rv:35.0) Gecko/20100101 Firefox/35.0"
+        )
+        wd = webdriver.PhantomJS(desired_capabilities=dcap)
 
 
 def send_keys(locator, text):
@@ -25,11 +33,14 @@ def send_keys(locator, text):
 def login(user_login, user_password):
     global wd
     wd.get(base_url)
+ #   wd.save_screenshot('t.png')
     wd.find_element_by_link_text("Вход").click()
     send_keys("authorisation_login", user_login)
     send_keys("authorisation_pass", user_password)
     wd.find_element_by_link_text("Войти").click()
+
     sleep(5)
+ #   wd.save_screenshot('1.png')
 
 
 def get_projects_data():
@@ -37,16 +48,17 @@ def get_projects_data():
     получение исходных данных о проекте: ид, ссылка, количество ключей
     :return: list of Project()
     """
-    project = Project()
-    result = list()
+ #   wd.save_screenshot('2_get_project_data_start.png')
+    sleep(5)
+#    project = dict()
+    result = dict()
     project_list = wd.find_elements_by_css_selector('.project.tag1')
     for row in project_list:
-        project.title = row.find_element_by_css_selector('span.site').get_attribute('title')
-        project.keywords_count = row.find_element_by_css_selector('.count_keywords').text
-        project.tv_url = row.find_element_by_css_selector('a.dynamics').get_attribute('href')
-        result.append(Project(title=project.title,
-                              keywords_count=project.keywords_count,
-                              tv_url=project.tv_url))
+        title = row.find_element_by_css_selector('span.site').get_attribute('title')
+       # project.keywords_count = row.find_element_by_css_selector('.count_keywords').text
+        tv_url = row.find_element_by_css_selector('a.dynamics').get_attribute('href')
+        result[title] = tv_url
+ #   wd.save_screenshot('3_get_project_data_finish.png')
     return result
 
 
@@ -73,12 +85,6 @@ def get_combobox_options(cb_name):
         except:
             pass
     return result
-
-
-def save_project(project):
-    import json
-    with open('test.json', 'w') as out_file:
-        out_file.write(json.dumps(project, lambda x: x.__dict__, indent=2))
 
 
 def get_group_statistic(d_list):
@@ -158,23 +164,32 @@ def get_se_statistic(region = None):
 
 
 def set_dates():
-    from selenium.webdriver.common.keys import Keys
-    from selenium.webdriver import ActionChains
     global wd
-    w = wd
     wd.find_element_by_css_selector(".dates_text").click()
     wd.find_element_by_name('date1').click()
-    wd.find_element_by_name('date1').clear()
-    send_keys('date1', '01.01.2013')
-    wd.find_element_by_css_selector(".btn.go").click()
+    wd.find_element_by_name('date1').send_keys(Keys.HOME)
+    wd.find_element_by_name('date1').send_keys('09.10.2009' + Keys.END + 10 * Keys.BACKSPACE)
+    # wd.find_element_by_name('date1').send_keys()
+    sleep(1)
+    wd.find_elements_by_css_selector(".btn.go")[2].click()
+    sleep(5)
+
+def save_project(project, file_name):
+    import json
+    with open('%s.json' %file_name, 'w') as out_file:
+        out_file.write(json.dumps(project, lambda x: x.__dict__, indent=2))
 
 
-def get_project_statistic(project):
-    wd.get(project.tv_url)
+def get_project_statistic(project_url, project_list):
+    wd.get(project_url)
+#    wd.save_screenshot('project_page.png')
+
     all = {}
     se_stat = {}
     se_list = get_combobox_options("searcher")[:-2]
+    print ('se_list %s' % se_list)
     set_dates()
+    sleep(15)
     SE_FULL = ('Yandex', 'Google', 'go.Mail')
     SE_SHORT = ('Google.com', 'Yandex.com')
     reg_num = 0
@@ -188,24 +203,36 @@ def get_project_statistic(project):
             elif se_list[index] == 'Google.com':
                 se_stat[se_list[index]] = get_se_statistic('87')
             all[se_list[index]] = se_stat[se_list[index]]
-            reg_num+=1
-    save_project(all)
+            reg_num += 1
+    project_list[project_url] = all
+    # file_name = owner
+    # save_project(project=project_list, file_name=file_name)
 
     # получение позиций
 
 #    save_project(project)
+def save_project_list(project_list, file_name):
+    import json
+    with open('%s.json' % file_name, 'w') as out_file:
+        out_file.write(json.dumps(projects, indent=2))
 
-
-init_session()
+init_session(debug=True)
 login(user_login, user_password)
-try:
-    projects = get_projects_data()
-    print(projects)
+#try:
+projects = get_projects_data()
+file_name = 'project_list_%s' % user_login
+save_project_list(projects, file_name)
 
 #    for num in range(len(projects)):
-    num = 0
-    get_project_statistic(projects[num])
-#except:
-#    print('Some error')
-finally:
-    wd.close()
+project_statistic = dict()
+for num in projects:
+    get_project_statistic(projects[num], project_statistic)
+
+file_name = user_login
+save_project(project=project_statistic, file_name=file_name)
+
+# except:
+#     wd.save_screenshot('Error.png')
+# finally:
+#     pass
+    #wd.close()
