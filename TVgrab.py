@@ -3,23 +3,23 @@ from selenium import webdriver
 from selenium.webdriver.common.desired_capabilities import DesiredCapabilities
 from selenium.webdriver.support.ui import Select
 from time import sleep
-from topvizproject import Project
 from selenium.webdriver.common.keys import Keys
 
 user_login = "rafiq@list.ru"
 user_password = "ump.87uv"
 base_url = 'https://topvisor.ru/projects/'
 
+
 def init_session(debug=False):
     global wd
     if debug:
         wd = webdriver.Firefox()
         wd.maximize_window()
-    else: # основной PhantomJS
+    else:
+        # основной PhantomJS
         dcap = dict(DesiredCapabilities.PHANTOMJS)
-        dcap["phantomjs.page.settings.userAgent"] = (
-           "Mozilla/5.0 (Windows NT 6.1; WOW64; rv:35.0) Gecko/20100101 Firefox/35.0"
-        )
+        user_agent = "Mozilla/5.0 (Windows NT 6.1; WOW64; rv:35.0) Gecko/20100101 Firefox/35.0"
+        dcap["phantomjs.page.settings.userAgent"] = list(user_agent)
         wd = webdriver.PhantomJS(desired_capabilities=dcap)
 
 
@@ -33,14 +33,13 @@ def send_keys(locator, text):
 def login(user_login, user_password):
     global wd
     wd.get(base_url)
- #   wd.save_screenshot('t.png')
+    #   wd.save_screenshot('t.png')
     wd.find_element_by_link_text("Вход").click()
     send_keys("authorisation_login", user_login)
     send_keys("authorisation_pass", user_password)
     wd.find_element_by_link_text("Войти").click()
-
     sleep(5)
- #   wd.save_screenshot('1.png')
+    #   wd.save_screenshot('1.png')
 
 
 def get_projects_data():
@@ -48,17 +47,16 @@ def get_projects_data():
     получение исходных данных о проекте: ид, ссылка, количество ключей
     :return: list of Project()
     """
- #   wd.save_screenshot('2_get_project_data_start.png')
+    #   wd.save_screenshot('2_get_project_data_start.png')
     sleep(5)
-#    project = dict()
     result = dict()
     project_list = wd.find_elements_by_css_selector('.project.tag1')
     for row in project_list:
         title = row.find_element_by_css_selector('span.site').get_attribute('title')
-       # project.keywords_count = row.find_element_by_css_selector('.count_keywords').text
+        # project.keywords_count = row.find_element_by_css_selector('.count_keywords').text
         tv_url = row.find_element_by_css_selector('a.dynamics').get_attribute('href')
         result[title] = tv_url
- #   wd.save_screenshot('3_get_project_data_finish.png')
+    #   wd.save_screenshot('3_get_project_data_finish.png')
     return result
 
 
@@ -70,7 +68,6 @@ def get_info_list(css_selector):
     for keyword in keywords:
         k_list.append(keyword.text)
         print(keyword.text)
-#    print('GIL end')
     return k_list
 
 
@@ -92,27 +89,29 @@ def get_group_statistic(d_list):
     # Получение списка ключей
     k_list = get_info_list('div.tag0.middle')
     print('Список ключей: %s' % k_list)
-    if len(k_list)>10:
-        Select(wd.find_element_by_name("limit")).select_by_index(6) # установка кол-ва ключей на страницу
+    if len(k_list) > 10:
+        # установка кол-ва ключей на страницу
+        Select(wd.find_element_by_name("limit")).select_by_index(6)
         sleep(5)
-        if len(k_list)>1000:
+        if len(k_list) > 1000:
             page_count = len(get_combobox_options('page'))
         else:
             page_count = 1
     # получение дат
     table = wd.find_element_by_id('dynamics_table')
     row = table.find_elements_by_css_selector('div.cols>table>tbody>tr')
-    keyword_statisic = {}
+    keyword_statistic = {}
     for k_index in range(len(k_list)):
         date_pos = {}
         for d_index in range(len(d_list)):
             try:
-                pos = row[k_index+1].find_elements_by_css_selector('td')[d_index].find_element_by_css_selector('div>a').text
+                pos = row[k_index+1].find_elements_by_css_selector('td')[d_index].\
+                    find_element_by_css_selector('div>a').text
             except:
                 pos = '-'
             date_pos[d_list[d_index]] = pos
-        keyword_statisic[k_list[k_index]] = date_pos
-    return keyword_statisic
+        keyword_statistic[k_list[k_index]] = date_pos
+    return keyword_statistic
 
 
 def get_region_statistic():
@@ -128,7 +127,7 @@ def get_region_statistic():
         print('Получение статистики группы')
         k_w = get_group_statistic(d_list)
         print('Гет регион статистик: %s' % k_w)
-        groups[g_list[g_num]]=k_w
+        groups[g_list[g_num]] = k_w
     return groups
 
 
@@ -139,16 +138,16 @@ def get_region_ids():
     options = cb.find_elements_by_css_selector('option')
     for option in options:
         try:
-            punkt = option.get_attribute("value")
-            colpos = punkt.find(':')
-            if colpos > 0 and punkt.find('-') == -1:
-                result.append(punkt[:colpos])
+            value = option.get_attribute("value")
+            column_position = value.find(':')
+            if column_position > 0 and value.find('-') == -1:
+                result.append(value[:column_position])
         except:
             pass
     return result
 
 
-def get_se_statistic(region = None):
+def get_se_statistic(region=None):
     r_list = list()
     if region is None:
         r_list = get_region_ids()
@@ -159,7 +158,7 @@ def get_se_statistic(region = None):
         Select(wd.find_element_by_name("region_key")).select_by_index(r_num)
         sleep(5)
         kw = get_region_statistic()
-        regions[r_list[r_num]]=kw
+        regions[r_list[r_num]] = kw
     return regions
 
 
@@ -169,14 +168,14 @@ def set_dates():
     wd.find_element_by_name('date1').click()
     wd.find_element_by_name('date1').send_keys(Keys.HOME)
     wd.find_element_by_name('date1').send_keys('09.10.2009' + Keys.END + 10 * Keys.BACKSPACE)
-    # wd.find_element_by_name('date1').send_keys()
     sleep(1)
     wd.find_elements_by_css_selector(".btn.go")[2].click()
     sleep(5)
 
-def save_project(project, file_name):
+
+def save_project(project, export_file_name):
     import json
-    with open('%s.json' %file_name, 'w') as out_file:
+    with open('%s.json' % export_file_name, 'w') as out_file:
         out_file.write(json.dumps(project, lambda x: x.__dict__, indent=2))
 
 
@@ -187,15 +186,15 @@ def get_project_statistic(project_url, project_list):
     all = {}
     se_stat = {}
     se_list = get_combobox_options("searcher")[:-2]
-    print ('se_list %s' % se_list)
+    print('se_list %s' % se_list)
     set_dates()
     sleep(15)
-    SE_FULL = ('Yandex', 'Google', 'go.Mail')
-    SE_SHORT = ('Google.com', 'Yandex.com')
+    se_full = ('Yandex', 'Google', 'go.Mail')
+    se_short = ('Google.com', 'Yandex.com')
     reg_num = 0
     for index in range(len(se_list)):
-        if (se_list[index] in SE_FULL) or (se_list[index] in SE_SHORT):
-            if se_list[index] in SE_FULL:
+        if (se_list[index] in se_full) or (se_list[index] in se_short):
+            if se_list[index] in se_full:
                 Select(wd.find_element_by_name("searcher")).select_by_index(index)
                 se_stat[se_list[index]] = get_se_statistic()
             elif se_list[index] == 'Yandex.com':
@@ -205,16 +204,12 @@ def get_project_statistic(project_url, project_list):
             all[se_list[index]] = se_stat[se_list[index]]
             reg_num += 1
     project_list[project_url] = all
-    # file_name = owner
-    # save_project(project=project_list, file_name=file_name)
 
-    # получение позиций
 
-#    save_project(project)
-def save_project_list(project_list, file_name):
+def save_project_list(project_list, export_file_name):
     import json
-    with open('%s.json' % file_name, 'w') as out_file:
-        out_file.write(json.dumps(projects, indent=2))
+    with open('%s.json' % export_file_name, 'w') as out_file:
+        out_file.write(json.dumps(project_list, indent=2))
 
 init_session(debug=True)
 login(user_login, user_password)
@@ -223,15 +218,14 @@ try:
     file_name = 'project_list_%s' % user_login
     save_project_list(projects, file_name)
 
-    #    for num in range(len(projects)):
     project_statistic = dict()
     for num in projects:
         get_project_statistic(projects[num], project_statistic)
 
     file_name = user_login
-    save_project(project=project_statistic, file_name=file_name)
+    save_project(project=project_statistic, export_file_name=file_name)
 
 except:
-     wd.save_screenshot('Error.png')
+    wd.save_screenshot('Error.png')
 finally:
     wd.close()
