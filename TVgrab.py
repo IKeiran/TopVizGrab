@@ -4,6 +4,7 @@ from selenium.webdriver.common.desired_capabilities import DesiredCapabilities
 from selenium.webdriver.support.ui import Select
 from time import sleep
 from selenium.webdriver.common.keys import Keys
+from selenium.common.exceptions import NoSuchElementException
 
 user_login = "rafiq@list.ru"
 user_password = "ump.87uv"
@@ -38,7 +39,7 @@ def login(user_login, user_password):
     send_keys("authorisation_login", user_login)
     send_keys("authorisation_pass", user_password)
     wd.find_element_by_link_text("Войти").click()
-    sleep(5)
+    wait_until_element_present('.spoiler-head')
     #   wd.save_screenshot('1.png')
 
 
@@ -55,7 +56,7 @@ def get_projects_data():
         title = row.find_element_by_css_selector('span.site').get_attribute('title')
         # project.keywords_count = row.find_element_by_css_selector('.count_keywords').text
         tv_url = row.find_element_by_css_selector('a.dynamics').get_attribute('href')
-        result[title] = tv_url
+        result[tv_url] = title
     #   wd.save_screenshot('3_get_project_data_finish.png')
     return result
 
@@ -114,6 +115,19 @@ def get_group_statistic(d_list):
     return keyword_statistic
 
 
+def wait_until_element_present(css_locator, wait_time=10):
+    global wd
+    time = 0
+    def skip(time):
+        sleep(1)
+        time += 1
+    try:
+        while (not wd.find_element_by_css_selector(css_locator).is_displayed()) and (time < wait_time):
+            skip(time)
+    except NoSuchElementException:
+            skip(time)
+
+
 def get_region_statistic():
     g_list = get_combobox_options('group_id')[1:]
     groups = {}
@@ -123,7 +137,7 @@ def get_region_statistic():
     for g_num in range(len(g_list)):
         print('Выбор группы %s' % g_list[g_num])
         Select(wd.find_element_by_name("group_id")).select_by_index(g_num+1)
-        sleep(5)
+        wait_until_element_present('.up_position.min_width')
         print('Получение статистики группы')
         k_w = get_group_statistic(d_list)
         print('Гет регион статистик: %s' % k_w)
@@ -156,7 +170,7 @@ def get_se_statistic(region=None):
     regions = {}
     for r_num in range(len(r_list)):
         Select(wd.find_element_by_name("region_key")).select_by_index(r_num)
-        sleep(5)
+        wait_until_element_present('.up_position.min_width')
         kw = get_region_statistic()
         regions[r_list[r_num]] = kw
     return regions
@@ -170,7 +184,7 @@ def set_dates():
     wd.find_element_by_name('date1').send_keys('09.10.2009' + Keys.END + 10 * Keys.BACKSPACE)
     sleep(1)
     wd.find_elements_by_css_selector(".btn.go")[2].click()
-    sleep(5)
+    sleep(1)
 
 
 def save_project(project, export_file_name):
@@ -179,16 +193,15 @@ def save_project(project, export_file_name):
         out_file.write(json.dumps(project, lambda x: x.__dict__, indent=2))
 
 
-def get_project_statistic(project_url, project_list):
+def get_project_statistic(project_url, site_url, project_list):
     wd.get(project_url)
 #    wd.save_screenshot('project_page.png')
 
-    all = {}
+    project_statistics = {}
     se_stat = {}
     se_list = get_combobox_options("searcher")[:-2]
     print('se_list %s' % se_list)
     set_dates()
-    sleep(15)
     se_full = ('Yandex', 'Google', 'go.Mail')
     se_short = ('Google.com', 'Yandex.com')
     reg_num = 0
@@ -201,9 +214,11 @@ def get_project_statistic(project_url, project_list):
                 se_stat[se_list[index]] = get_se_statistic('87')
             elif se_list[index] == 'Google.com':
                 se_stat[se_list[index]] = get_se_statistic('87')
-            all[se_list[index]] = se_stat[se_list[index]]
+            project_statistics[se_list[index]] = se_stat[se_list[index]]
             reg_num += 1
-    project_list[project_url] = all
+    project_statistics_with_url = dict()
+    project_statistics_with_url[site_url] = project_statistics
+    project_list[project_url] = project_statistics_with_url
 
 
 def save_project_list(project_list, export_file_name):
@@ -220,12 +235,11 @@ try:
 
     project_statistic = dict()
     for num in projects:
-        get_project_statistic(projects[num], project_statistic)
-
+        get_project_statistic(project_url=num, site_url=projects[num], project_list=project_statistic)
     file_name = user_login
     save_project(project=project_statistic, export_file_name=file_name)
 
-except:
-    wd.save_screenshot('Error.png')
+# except:
+#     wd.save_screenshot('Error.png')
 finally:
     wd.close()
