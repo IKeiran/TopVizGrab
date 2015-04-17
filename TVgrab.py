@@ -229,17 +229,22 @@ def save_project_list(project_list, export_file_name):
 init_session(debug=True)
 login(user_login, user_password)
 try:
-    projects = get_projects_data()
+    full_info = dict()
+    full_info['login'] = user_login
+    full_info['password'] = user_password
+    full_info['projects'] = get_projects_data()
+
     file_name = 'project_list_%s' % user_login
-    save_project_list(projects, file_name)
 
-    project_statistic = dict()
-    for num in projects:
-        get_project_statistic(project_url=num, site_url=projects[num], project_list=project_statistic)
-    file_name = user_login
-    save_project(project=project_statistic, export_file_name=file_name)
+    save_project_list(full_info, file_name)
 
-# except:
-#     wd.save_screenshot('Error.png')
+    # project_statistic = dict()
+    # for num in projects:
+    #     get_project_statistic(project_url=num, site_url=projects[num], project_list=project_statistic)
+    # file_name = user_login
+    # save_project(project=project_statistic, export_file_name=file_name)
+except NoSuchElementException:
+    print('Element not found')
+    wd.save_screenshot('Error.png')
 finally:
     wd.close()
