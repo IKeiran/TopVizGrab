@@ -51,13 +51,23 @@ def get_projects_data():
     #   wd.save_screenshot('2_get_project_data_start.png')
     sleep(5)
     result = dict()
-    project_list = wd.find_elements_by_css_selector('.project.tag1')
+    project_list = list()
+    active_block = wd.find_elements_by_css_selector('.spoiler-wrapper')[0:3] # архивные проекты вырезаю
+    for i in range(2):
+        try:
+            projects = active_block[i].find_elements_by_css_selector('.project.tag1')
+            if len(projects) > 0:
+                for pr in projects:
+                    project_list.append(pr)
+        except:
+            pass
     for row in project_list:
         title = row.find_element_by_css_selector('span.site').get_attribute('title')
         # project.keywords_count = row.find_element_by_css_selector('.count_keywords').text
         tv_url = row.find_element_by_css_selector('a.dynamics').get_attribute('href')
         result[tv_url] = title
     #   wd.save_screenshot('3_get_project_data_finish.png')
+    print('all_done')
     return result
 
 
@@ -87,32 +97,45 @@ def get_combobox_options(cb_name):
 
 def get_group_statistic(d_list):
     global wd
+    keys_in_list = 10
     # Получение списка ключей
+    keywords_count = wd.find_element_by_css_selector('.total').text[1:-1]
+
     k_list = get_info_list('div.tag0.middle')
-    print('Список ключей: %s' % k_list)
+    print('Список ключей: %s, количество: %d' % (k_list, len(k_list)))
+    Select(wd.find_element_by_name("limit")).select_by_index(0)
     if len(k_list) > 10:
         # установка кол-ва ключей на страницу
-        Select(wd.find_element_by_name("limit")).select_by_index(6)
+        Select(wd.find_element_by_name("limit")).select_by_index(0)
         sleep(5)
-        if len(k_list) > 1000:
+        if len(k_list) > 1:
             page_count = len(get_combobox_options('page'))
-        else:
-            page_count = 1
+    else:
+        page_count = 1
     # получение дат
     table = wd.find_element_by_id('dynamics_table')
     row = table.find_elements_by_css_selector('div.cols>table>tbody>tr')
     keyword_statistic = {}
-    for k_index in range(len(k_list)):
-        date_pos = {}
-        for d_index in range(len(d_list)):
-            try:
-                pos = row[k_index+1].find_elements_by_css_selector('td')[d_index].\
-                    find_element_by_css_selector('div>a').text
-            except:
-                pos = '-'
-            date_pos[d_list[d_index]] = pos
-        keyword_statistic[k_list[k_index]] = date_pos
-    return keyword_statistic
+    print('pagecount %d' % page_count)
+    print('установка нулевого индекса')
+    for i in range(page_count):
+        print('pagenum %d of %d' % (i, page_count))
+        if i > 0:
+            print('set %d pagenum of %d' % (i, page_count))
+            Select(wd.find_element_by_name("page")).select_by_index(i)
+            sleep(10)
+
+        for k_index in range(len(k_list)):
+             date_pos = {}
+             for d_index in range(len(d_list)):
+                 try:
+                     pos = row[k_index+1].find_elements_by_css_selector('td')[d_index].\
+                         find_element_by_css_selector('div>a').text
+                 except:
+                     pos = '-'
+                 date_pos[d_list[d_index]] = pos
+             keyword_statistic[k_list[k_index]] = date_pos
+        return keyword_statistic
 
 
 def wait_until_element_present(css_locator, wait_time=10):
@@ -129,21 +152,26 @@ def wait_until_element_present(css_locator, wait_time=10):
 
 
 def get_region_statistic():
-    g_list = get_combobox_options('group_id')[1:]
-    groups = {}
-    print('Найдено групп %d' % len(g_list))
-    d_list = get_info_list('td>span.date')
-    print('Список дат %s' % d_list)
-    for g_num in range(len(g_list)):
-        print('Выбор группы %s' % g_list[g_num])
-        Select(wd.find_element_by_name("group_id")).select_by_index(g_num+1)
-        wait_until_element_present('.up_position.min_width')
-        print('Получение статистики группы')
-        k_w = get_group_statistic(d_list)
-        print('Гет регион статистик: %s' % k_w)
-        groups[g_list[g_num]] = k_w
-    return groups
+    try:
+        g_list = get_combobox_options('group_id')[1:]
+        groups = {}
+        print('Найдено групп %d' % len(g_list))
+        d_list = get_info_list('td>span.date')
+        print('Список дат %s' % d_list)
+        for g_num in range(len(g_list)):
+            print('Выбор группы %s' % g_list[g_num])
+            Select(wd.find_element_by_name("group_id")).select_by_index(g_num+1)
+            wait_until_element_present('.up_position.min_width')
+            print('Получение статистики группы %s' %g_num)
+            k_w = get_group_statistic(d_list)
+            print('Гет регион статистик: %s' % g_list[g_num])
+            groups[g_list[g_num]] = k_w
+            print('Получено: %s' % groups[g_list[g_num]])
 
+        return groups
+    finally:
+        print('No groups find')
+        return groups
 
 def get_region_ids():
     global wd
@@ -169,6 +197,7 @@ def get_se_statistic(region=None):
         r_list.append(region)
     regions = {}
     for r_num in range(len(r_list)):
+        print('Анализ региона %s' %r_list[r_num])
         Select(wd.find_element_by_name("region_key")).select_by_index(r_num)
         wait_until_element_present('.up_position.min_width')
         kw = get_region_statistic()
@@ -196,7 +225,7 @@ def save_project(project, export_file_name):
 def get_project_statistic(project_url, site_url, project_list):
     wd.get(project_url)
 #    wd.save_screenshot('project_page.png')
-
+    print('получение статистики по проекту %s' % site_url)
     project_statistics = {}
     se_stat = {}
     se_list = get_combobox_options("searcher")[:-2]
@@ -233,18 +262,16 @@ try:
     full_info['login'] = user_login
     full_info['password'] = user_password
     full_info['projects'] = get_projects_data()
-
     file_name = 'project_list_%s' % user_login
-
     save_project_list(full_info, file_name)
 
-    # project_statistic = dict()
-    # for num in projects:
-    #     get_project_statistic(project_url=num, site_url=projects[num], project_list=project_statistic)
-    # file_name = user_login
-    # save_project(project=project_statistic, export_file_name=file_name)
+    project_statistic = dict()
+    for num in full_info['projects']:
+        get_project_statistic(project_url=num, site_url=full_info['projects'][num], project_list=project_statistic)
+    file_name = user_login
+    save_project(project=project_statistic, export_file_name=file_name)
 except NoSuchElementException:
-    print('Element not found')
-    wd.save_screenshot('Error.png')
+     print('Element not found')
+     wd.save_screenshot('Error.png')
 finally:
     wd.close()
