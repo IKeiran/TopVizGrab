@@ -11,6 +11,11 @@ user_password = "ump.87uv"
 base_url = 'https://topvisor.ru/projects/'
 
 
+def print_log(text):
+    global debug
+    if debug:
+        print(text)
+
 def init_session(debug=False):
     global wd
     if debug:
@@ -67,7 +72,7 @@ def get_projects_data():
         tv_url = row.find_element_by_css_selector('a.dynamics').get_attribute('href')
         result[tv_url] = title
     #   wd.save_screenshot('3_get_project_data_finish.png')
-    print('all_done')
+    print_log('all_done')
     return result
 
 
@@ -78,7 +83,7 @@ def get_info_list(css_selector):
     k_list = list()
     for keyword in keywords:
         k_list.append(keyword.text)
-        print(keyword.text)
+        print_log(keyword.text)
     return k_list
 
 
@@ -95,47 +100,50 @@ def get_combobox_options(cb_name):
     return result
 
 
-def get_group_statistic(d_list):
+def get_group_statistic(date_list):
     global wd
-    keys_in_list = 10
+    keys_on_page = 10
     # Получение списка ключей
     keywords_count = wd.find_element_by_css_selector('.total').text[1:-1]
-
-    k_list = get_info_list('div.tag0.middle')
-    print('Список ключей: %s, количество: %d' % (k_list, len(k_list)))
-    Select(wd.find_element_by_name("limit")).select_by_index(0)
-    if len(k_list) > 10:
+    if int(keywords_count) > 10:
+        print_log('установка кол-ва ключей на страницу')
         # установка кол-ва ключей на страницу
         Select(wd.find_element_by_name("limit")).select_by_index(0)
         sleep(5)
-        if len(k_list) > 1:
-            page_count = len(get_combobox_options('page'))
+        page_count = int(keywords_count) // keys_on_page + 1
     else:
         page_count = 1
-    # получение дат
-    table = wd.find_element_by_id('dynamics_table')
-    row = table.find_elements_by_css_selector('div.cols>table>tbody>tr')
+    print_log('количество страниц %d' % page_count)
     keyword_statistic = {}
-    print('pagecount %d' % page_count)
-    print('установка нулевого индекса')
+
     for i in range(page_count):
-        print('pagenum %d of %d' % (i, page_count))
+        print_log('Страница %d из %d' % (i, page_count))
         if i > 0:
-            print('set %d pagenum of %d' % (i, page_count))
+            print_log('Установлена %d страница из %d' % (i, page_count))
             Select(wd.find_element_by_name("page")).select_by_index(i)
             sleep(10)
 
+        k_list = get_info_list('div.tag0.middle')
+        print_log('Список ключей: %s, количество: %d' % (k_list, len(k_list)))
+        Select(wd.find_element_by_name("limit")).select_by_index(0)
+
+        # получение дат
+        table = wd.find_element_by_id('dynamics_table')
+        row = table.find_elements_by_css_selector('div.cols>table>tbody>tr')
+
         for k_index in range(len(k_list)):
-             date_pos = {}
-             for d_index in range(len(d_list)):
-                 try:
-                     pos = row[k_index+1].find_elements_by_css_selector('td')[d_index].\
-                         find_element_by_css_selector('div>a').text
-                 except:
-                     pos = '-'
-                 date_pos[d_list[d_index]] = pos
-             keyword_statistic[k_list[k_index]] = date_pos
-        return keyword_statistic
+            date_pos = {}
+            for d_index in range(len(date_list)):
+                try:
+                    pos = row[k_index+1].find_elements_by_css_selector('td')[d_index].\
+                        find_element_by_css_selector('div>a').text
+                except NoSuchElementException:
+                    pos = '-'
+                date_pos[date_list[d_index]] = pos
+            keyword_statistic[k_list[k_index]] = date_pos
+            print_log('Keywords statistic %s' % keyword_statistic)
+    print_log('Пагинация завершена, итоговый результат: ' % keyword_statistic)
+    return keyword_statistic
 
 
 def wait_until_element_present(css_locator, wait_time=10):
@@ -155,22 +163,21 @@ def get_region_statistic():
     try:
         g_list = get_combobox_options('group_id')[1:]
         groups = {}
-        print('Найдено групп %d' % len(g_list))
+        print_log('Найдено групп %d' % len(g_list))
         d_list = get_info_list('td>span.date')
-        print('Список дат %s' % d_list)
+        print_log('Список дат %s' % d_list)
         for g_num in range(len(g_list)):
-            print('Выбор группы %s' % g_list[g_num])
+            print_log('Выбор группы %s' % g_list[g_num])
             Select(wd.find_element_by_name("group_id")).select_by_index(g_num+1)
             wait_until_element_present('.up_position.min_width')
-            print('Получение статистики группы %s' %g_num)
+            print_log('Получение статистики группы %s' %g_num)
             k_w = get_group_statistic(d_list)
-            print('Гет регион статистик: %s' % g_list[g_num])
+            print_log('Гет регион статистик: %s' % g_list[g_num])
             groups[g_list[g_num]] = k_w
-            print('Получено: %s' % groups[g_list[g_num]])
-
+            print_log('Получено: %s' % groups[g_list[g_num]])
         return groups
-    finally:
-        print('No groups find')
+    except:
+        print_log('No groups find')
         return groups
 
 def get_region_ids():
@@ -197,7 +204,7 @@ def get_se_statistic(region=None):
         r_list.append(region)
     regions = {}
     for r_num in range(len(r_list)):
-        print('Анализ региона %s' %r_list[r_num])
+        print_log('Анализ региона %s' %r_list[r_num])
         Select(wd.find_element_by_name("region_key")).select_by_index(r_num)
         wait_until_element_present('.up_position.min_width')
         kw = get_region_statistic()
@@ -225,11 +232,11 @@ def save_project(project, export_file_name):
 def get_project_statistic(project_url, site_url, project_list):
     wd.get(project_url)
 #    wd.save_screenshot('project_page.png')
-    print('получение статистики по проекту %s' % site_url)
+    print_log('получение статистики по проекту %s' % site_url)
     project_statistics = {}
     se_stat = {}
     se_list = get_combobox_options("searcher")[:-2]
-    print('se_list %s' % se_list)
+    print_log('se_list %s' % se_list)
     set_dates()
     se_full = ('Yandex', 'Google', 'go.Mail')
     se_short = ('Google.com', 'Yandex.com')
@@ -255,7 +262,8 @@ def save_project_list(project_list, export_file_name):
     with open('%s.json' % export_file_name, 'w') as out_file:
         out_file.write(json.dumps(project_list, indent=2))
 
-init_session(debug=True)
+debug = True 
+init_session(debug=debug)
 login(user_login, user_password)
 try:
     full_info = dict()
@@ -271,7 +279,7 @@ try:
     file_name = user_login
     save_project(project=project_statistic, export_file_name=file_name)
 except NoSuchElementException:
-     print('Element not found')
+     print_log('Element not found')
      wd.save_screenshot('Error.png')
 finally:
     wd.close()
