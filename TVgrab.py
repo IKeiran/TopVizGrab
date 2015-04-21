@@ -50,7 +50,7 @@ def login(user_login, user_password):
 
 def get_projects_data():
     """
-    получение исходных данных о проекте: ид, ссылка, количество ключей
+    получение исходных данных о проект: ид, ссылка, количество ключей
     :return: list of Project()
     """
     #   wd.save_screenshot('2_get_project_data_start.png')
@@ -102,13 +102,13 @@ def get_combobox_options(cb_name):
 
 def get_group_statistic(date_list):
     global wd
-    keys_on_page = 10
+    keys_on_page = 1000
     # Получение списка ключей
     keywords_count = wd.find_element_by_css_selector('.total').text[1:-1]
     if int(keywords_count) > 10:
         print_log('установка кол-ва ключей на страницу')
         # установка кол-ва ключей на страницу
-        Select(wd.find_element_by_name("limit")).select_by_index(0)
+        Select(wd.find_element_by_name("limit")).select_by_index(6)
         sleep(5)
         page_count = int(keywords_count) // keys_on_page + 1
     else:
@@ -135,7 +135,7 @@ def get_group_statistic(date_list):
             date_pos = {}
             for d_index in range(len(date_list)):
                 try:
-                    pos = row[k_index+1].find_elements_by_css_selector('td')[d_index].\
+                    pos = row[k_index + 1].find_elements_by_css_selector('td')[d_index].\
                         find_element_by_css_selector('div>a').text
                 except NoSuchElementException:
                     pos = '-'
@@ -164,7 +164,6 @@ def get_region_statistic():
         g_list = get_combobox_options('group_id')[1:]
         groups = {}
         print_log('Найдено групп %d' % len(g_list))
-        d_list = list()
         d_list = get_info_list('td>span.date')
         print_log('Список дат %s' % d_list)
         for g_num in range(len(g_list)):
@@ -172,8 +171,6 @@ def get_region_statistic():
             Select(wd.find_element_by_name("group_id")).select_by_index(g_num+1)
             wait_until_element_present('.up_position.min_width')
             print_log('Получение статистики группы %s' %g_num)
-            d_list.clear()
-            d_list = get_info_list('td>span.date')
             k_w = get_group_statistic(d_list)
             print_log('Гет регион статистик: %s' % g_list[g_num])
             groups[g_list[g_num]] = k_w
@@ -237,7 +234,7 @@ def get_project_statistic(project_url, site_url, project_list):
 #    wd.save_screenshot('project_page.png')
     print_log('получение статистики по проекту %s' % site_url)
     project_statistics = {}
-    se_stat = {}
+    se_stat = dict()
     se_list = get_combobox_options("searcher")[:-2]
     print_log('se_list %s' % se_list)
     set_dates()
@@ -245,15 +242,17 @@ def get_project_statistic(project_url, site_url, project_list):
     se_short = ('Google.com', 'Yandex.com')
     reg_num = 0
     for index in range(len(se_list)):
+        print_log('Обрабатывается ПС %s' % se_list[index])
         if (se_list[index] in se_full) or (se_list[index] in se_short):
             Select(wd.find_element_by_name("searcher")).select_by_index(index)
             if se_list[index] in se_full:
                 se_stat[se_list[index]] = get_se_statistic()
-            elif se_list[index] == 'Yandex.com':
-                se_stat[se_list[index]] = get_se_statistic('87')
-            elif se_list[index] == 'Google.com':
-                se_stat[se_list[index]] = get_se_statistic('87')
-            project_statistics[se_list[index]] = se_stat[se_list[index]]
+                project_statistics[se_list[index]] = se_stat[se_list[index]]
+            elif se_list[index] in se_short:
+                domain = se_list[index][:se_list[index].find('.')]
+                se_stat['global'] = get_se_statistic('87')
+                project_statistics[domain]['87'] = se_stat['global']['87']
+                print_log('успешно')
             reg_num += 1
     project_statistics_with_url = dict()
     project_statistics_with_url[site_url] = project_statistics
@@ -265,7 +264,7 @@ def save_project_list(project_list, export_file_name):
     with open('%s.json' % export_file_name, 'w') as out_file:
         out_file.write(json.dumps(project_list, indent=2))
 
-debug = True 
+debug = True
 init_session(debug=debug)
 login(user_login, user_password)
 try:
