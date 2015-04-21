@@ -64,7 +64,7 @@ def get_projects_data():
             if len(projects) > 0:
                 for pr in projects:
                     project_list.append(pr)
-        except:
+        except NoSuchElementException:
             pass
     for row in project_list:
         title = row.find_element_by_css_selector('span.site').get_attribute('title')
@@ -147,11 +147,11 @@ def get_group_statistic(date_list):
 
 
 def wait_until_element_present(css_locator, wait_time=10):
+    def skip(wate_time):
+        sleep(1)
+        wate_time += 1
     global wd
     time = 0
-    def skip(time):
-        sleep(1)
-        time += 1
     try:
         while (not wd.find_element_by_css_selector(css_locator).is_displayed()) and (time < wait_time):
             skip(time)
@@ -176,9 +176,10 @@ def get_region_statistic():
             groups[g_list[g_num]] = k_w
             print_log('Получено: %s' % groups[g_list[g_num]])
         return groups
-    except:
+    except NoSuchElementException:
         print_log('No groups find')
         return groups
+
 
 def get_region_ids():
     global wd
