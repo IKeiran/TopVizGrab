@@ -191,7 +191,7 @@ def get_region_ids():
             column_position = value.find(':')
             if column_position > 0 and value.find('-') == -1:
                 result.append(value[:column_position])
-        except:
+        except NoSuchElementException:
             pass
     return result
 
