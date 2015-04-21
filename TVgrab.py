@@ -72,7 +72,7 @@ def get_projects_data():
         tv_url = row.find_element_by_css_selector('a.dynamics').get_attribute('href')
         result[tv_url] = title
     #   wd.save_screenshot('3_get_project_data_finish.png')
-    print_log('all_done')
+    print_log('Получены все данные о проектах')
     return result
 
 
@@ -83,7 +83,7 @@ def get_info_list(css_selector):
     k_list = list()
     for keyword in keywords:
         k_list.append(keyword.text)
-        print_log(keyword.text)
+        print_log('get info list %s ' % keyword.text)
     return k_list
 
 
@@ -117,11 +117,11 @@ def get_group_statistic(date_list):
     keyword_statistic = {}
 
     for i in range(page_count):
-        print_log('Страница %d из %d' % (i, page_count))
+        print_log('Страница %d из %d' % (i+1, page_count))
         if i > 0:
             print_log('Установлена %d страница из %d' % (i, page_count))
             Select(wd.find_element_by_name("page")).select_by_index(i)
-            sleep(10)
+            sleep(2)
 
         k_list = get_info_list('div.tag0.middle')
         print_log('Список ключей: %s, количество: %d' % (k_list, len(k_list)))
@@ -164,6 +164,7 @@ def get_region_statistic():
         g_list = get_combobox_options('group_id')[1:]
         groups = {}
         print_log('Найдено групп %d' % len(g_list))
+        d_list = list()
         d_list = get_info_list('td>span.date')
         print_log('Список дат %s' % d_list)
         for g_num in range(len(g_list)):
@@ -171,6 +172,8 @@ def get_region_statistic():
             Select(wd.find_element_by_name("group_id")).select_by_index(g_num+1)
             wait_until_element_present('.up_position.min_width')
             print_log('Получение статистики группы %s' %g_num)
+            d_list.clear()
+            d_list = get_info_list('td>span.date')
             k_w = get_group_statistic(d_list)
             print_log('Гет регион статистик: %s' % g_list[g_num])
             groups[g_list[g_num]] = k_w
@@ -243,8 +246,8 @@ def get_project_statistic(project_url, site_url, project_list):
     reg_num = 0
     for index in range(len(se_list)):
         if (se_list[index] in se_full) or (se_list[index] in se_short):
+            Select(wd.find_element_by_name("searcher")).select_by_index(index)
             if se_list[index] in se_full:
-                Select(wd.find_element_by_name("searcher")).select_by_index(index)
                 se_stat[se_list[index]] = get_se_statistic()
             elif se_list[index] == 'Yandex.com':
                 se_stat[se_list[index]] = get_se_statistic('87')
