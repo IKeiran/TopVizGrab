@@ -5,9 +5,8 @@ from selenium.webdriver.support.ui import Select
 from time import sleep
 from selenium.webdriver.common.keys import Keys
 from selenium.common.exceptions import NoSuchElementException
+import argparse
 
-user_login = "rafiq@list.ru"
-user_password = "ump.87uv"
 base_url = 'https://topvisor.ru/projects/'
 
 
@@ -49,11 +48,9 @@ def login(user_login, user_password):
 
 
 def get_projects_data():
-    """
-    получение исходных данных о проекте: ид, ссылка, количество ключей
-    :return: list of Project()
-    """
-    #   wd.save_screenshot('2_get_project_data_start.png')
+    #получение исходных данных о проекте: ид, ссылка, количество ключей
+    #:return: list of Project()
+    #
     sleep(5)
     result = dict()
     project_list = list()
@@ -230,9 +227,18 @@ def save_project(project, export_file_name):
     with open('%s.json' % export_file_name, 'w') as out_file:
         out_file.write(json.dumps(project, lambda x: x.__dict__, indent=2))
 
+def get_site_url():
+    global wd
+    result = wd.find_element_by_css_selector('.trigger').text
+    result = 'http://%s/' % result
+    print_log('site_url = %s' % result)
+    return result
+
 
 def get_project_statistic(project_url, site_url, project_list):
     wd.get(project_url)
+    if site_url is None:
+        site_url = get_site_url()
 #    wd.save_screenshot('project_page.png')
     print_log('получение статистики по проекту %s' % site_url)
     project_statistics = {}
@@ -258,33 +264,77 @@ def get_project_statistic(project_url, site_url, project_list):
     project_statistics_with_url[site_url] = project_statistics
     project_list[project_url] = project_statistics_with_url
 
-
 def save_project_list(project_list, export_file_name):
     import json
     with open('%s.json' % export_file_name, 'w') as out_file:
         out_file.write(json.dumps(project_list, indent=2))
 
 
-def get_user_project_list():
-    global user_login, user_password
+def get_user_project_list(user_login,user_password):
     full_info = dict()
     full_info['login'] = user_login
     full_info['password'] = user_password
     full_info['projects'] = get_projects_data()
     return full_info
 
-debug = False
+
+def load_user_data(file_name):
+    import json
+    with open('%s.json' % file_name, 'r') as out_file:
+        result =(json.load(out_file))
+    return result
+
+
+
+parser = argparse.ArgumentParser(description='User data')
+parser.add_argument('--debug', action='store_true', help='debug mode [default = false]')
+parser.add_argument('--login', action='store', help='user login')
+parser.add_argument('--password', action='store', help='user password')
+parser.add_argument('--pid', action='store', help='project id')
+parser.add_argument('--datafile', action='store', help='json with userdata & project list')
+parser.add_argument('--getdata', action='store_true', help='collect user data in json file')
+
+parser_options = parser.parse_args()
+debug = parser_options.debug
+data_file = parser_options.datafile
+
+# --login rafiq@list.ru --pass ump.87uv --debug
+# --debug --datafile project_list_rafiq@list.ru
+# --debug --datafile project_list_rafiq@list.ru --pid 281590
+
+# загрузка данных из файла
+if data_file is not None:
+    full_info = load_user_data(data_file)
+elif (parser_options.login is not None) and (parser_options.password is not None):
+    full_info = dict()
+    full_info['login'] = parser_options.login
+    full_info['password'] = parser_options.password
+else:
+    print('No login or password')
+    exit()
+
 init_session(debug=debug)
-login(user_login, user_password)
-try:
-    full_info = get_user_project_list()
+login(user_login=full_info['login'],user_password=full_info['password'])
+
+if parser_options.getdata:
+    full_info = get_user_project_list(user_login=full_info['login'],user_password=full_info['password'])
     file_name = 'project_list_%s' % full_info['login']
     save_project_list(full_info, file_name)
+    exit()
 
+if parser_options.pid is not None:
+    # анализируем конкретный проект
+    top_viz_url = "https://topvisor.ru/project/dynamics/%s/" % parser_options.pid
+    site_url = None
+    full_info['projects'] = {top_viz_url: site_url}
+    print(full_info)
+
+try:
     project_statistic = dict()
     for num in full_info['projects']:
         get_project_statistic(project_url=num, site_url=full_info['projects'][num], project_list=project_statistic)
-    file_name = user_login
+
+    file_name = full_info['login']
     save_project(project=project_statistic, export_file_name=file_name)
 except NoSuchElementException:
     print_log('Element not found')
