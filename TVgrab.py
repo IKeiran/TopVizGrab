@@ -57,7 +57,8 @@ def get_projects_data():
     sleep(5)
     result = dict()
     project_list = list()
-    active_block = wd.find_elements_by_css_selector('.spoiler-wrapper')[0:3] # архивные проекты вырезаю
+    # архивные проекты вырезаю
+    active_block = wd.find_elements_by_css_selector('.spoiler-wrapper')[0:3]
     for i in range(2):
         try:
             projects = active_block[i].find_elements_by_css_selector('.project.tag1')
@@ -135,21 +136,21 @@ def get_group_statistic(date_list):
             date_pos = {}
             for d_index in range(len(date_list)):
                 try:
-                    pos = row[k_index+1].find_elements_by_css_selector('td')[d_index].\
+                    pos = row[k_index + 1].find_elements_by_css_selector('td')[d_index].\
                         find_element_by_css_selector('div>a').text
                 except NoSuchElementException:
                     pos = '-'
                 date_pos[date_list[d_index]] = pos
             keyword_statistic[k_list[k_index]] = date_pos
-            print_log('Keywords statistic %s' % keyword_statistic)
+            print_log('Keywords statistic %s;' % keyword_statistic)
     print_log('Пагинация завершена, итоговый результат: ' % keyword_statistic)
     return keyword_statistic
 
 
 def wait_until_element_present(css_locator, wait_time=10):
-    def skip(wate_time):
+    def skip(wating_time):
         sleep(1)
-        wate_time += 1
+        wating_time += 1
     global wd
     time = 0
     try:
@@ -160,15 +161,15 @@ def wait_until_element_present(css_locator, wait_time=10):
 
 
 def get_region_statistic():
+    groups = {}
     try:
         g_list = get_combobox_options('group_id')[1:]
-        groups = {}
         print_log('Найдено групп %d' % len(g_list))
         d_list = get_info_list('td>span.date')
         print_log('Список дат %s' % d_list)
         for g_num in range(len(g_list)):
             print_log('Выбор группы %s' % g_list[g_num])
-            Select(wd.find_element_by_name("group_id")).select_by_index(g_num+1)
+            Select(wd.find_element_by_name("group_id")).select_by_index(g_num + 1)
             wait_until_element_present('.up_position.min_width')
             print_log('Получение статистики группы %s' %g_num)
             k_w = get_group_statistic(d_list)
@@ -263,15 +264,21 @@ def save_project_list(project_list, export_file_name):
     with open('%s.json' % export_file_name, 'w') as out_file:
         out_file.write(json.dumps(project_list, indent=2))
 
-debug = True 
-init_session(debug=debug)
-login(user_login, user_password)
-try:
+
+def get_user_project_list():
+    global user_login, user_password
     full_info = dict()
     full_info['login'] = user_login
     full_info['password'] = user_password
     full_info['projects'] = get_projects_data()
-    file_name = 'project_list_%s' % user_login
+    return full_info
+
+debug = False
+init_session(debug=debug)
+login(user_login, user_password)
+try:
+    full_info = get_user_project_list()
+    file_name = 'project_list_%s' % full_info['login']
     save_project_list(full_info, file_name)
 
     project_statistic = dict()
