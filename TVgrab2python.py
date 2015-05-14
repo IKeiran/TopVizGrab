@@ -42,12 +42,20 @@ def login(user_login, user_password):
     global wd
     wd.get(base_url)
     #   wd.save_screenshot('t.png')
-    wd.find_element_by_link_text("Вход").click()
-    send_keys("authorisation_login", user_login)
-    send_keys("authorisation_pass", user_password)
-    wd.find_element_by_link_text("Войти").click()
-    wait_until_element_present('.spoiler-head')
-    #   wd.save_screenshot('1.png')
+    try:
+        wd.find_element_by_link_text("Вход").click()
+        send_keys("authorisation_login", user_login)
+        send_keys("authorisation_pass", user_password)
+        wd.find_element_by_link_text("Войти").click()
+        wait_until_element_present('.spoiler-head')
+        try:
+            wd.find_element_by_css_selector('.trigger').click()
+            login_sucsessfull = True
+        except:
+            login_sucsessfull = False
+    except:
+        login_sucsessfull = False
+    return login_sucsessfull
 
 
 def get_projects_data():
@@ -242,7 +250,7 @@ def get_project_statistic(project_url, site_url, project_list):
     wd.get(project_url)
     if site_url is None:
         site_url = get_site_url()
-    print_log(u'получение статистики по проекту %s' % site_url)
+    #print_log(u'получение статистики по проекту %s' % site_url)
     project_statistics = {}
     se_stat = {}
     se_list = get_combobox_options("searcher")[:-2]
@@ -289,68 +297,84 @@ def load_user_data(file_name):
 
 def get_parser_options():
     parser = argparse.ArgumentParser(description='User data')
-    parser.add_argument('--debug', action='store_true', help='debug mode [default = false]')
-    parser.add_argument('--login', action='store', help='user login')
-    parser.add_argument('--password', action='store', help='user password')
-    parser.add_argument('--pid', action='store', help='project id')
+    # parser.add_argument('--debug', action='store_true', help='debug mode [default = false]')
+    # parser.add_argument('--login', action='store', help='user login')
+    # parser.add_argument('--password', action='store', help='user password')
+    # parser.add_argument('--pid', action='store', help='project id')
+    # parser.add_argument('--datafile', action='store', help='json with userdata & project list')
+    # parser.add_argument('--project_list_only', action='store_true', help="collect only user's project list")
+
     parser.add_argument('--datafile', action='store', help='json with userdata & project list')
-    parser.add_argument('--project_list_only', action='store_true', help="collect only user's project list")
     return parser.parse_args()
 
 
 def main_script():
     global wd, full_info, parser_options
     if parser_options.datafile is not None:
-        full_info = load_user_data(data_file)
-    elif (parser_options.login is not None) and (parser_options.password is not None):
-        full_info = dict()
-        full_info['login'] = parser_options.login
-        full_info['password'] = parser_options.password
+        try:
+            full_info = load_user_data(data_file)
+        except:
+            return {'error': 'File not found'}
     else:
-        print('No login or password')
-        exit()
+        return {'error': 'File not found'}
+    # elif (parser_options.login is not None) and (parser_options.password is not None):
+    #     full_info = dict()
+    #     full_info['login'] = parser_options.login
+    #     full_info['password'] = parser_options.password
+    # else:
+    #     print('No login or password')
+    #     exit()
 
-
+    task = full_info['task']
     init_session(debug=debug)
-    login(user_login=full_info['login'],user_password=full_info['password'])
 
-    if parser_options.project_list_only:
-        full_info = get_user_project_list(user_login=full_info['login'],user_password=full_info['password'])
-        file_name = 'project_list_%s' % full_info['login']
-        save_project_list(full_info, file_name)
+    if not login(user_login=full_info['login'],user_password=full_info['password']):
         wd.close()
-        exit()
+        return {'error': 'Incorrect login/password'}
 
-    if parser_options.pid is not None:
+
+    GET_PROJECT_LIST = "get_projects_list"
+    GET_PROJECT_STATISTIC = "get_project_statistic"
+    if task == GET_PROJECT_LIST:
+        result = get_user_project_list(user_login=full_info['login'],user_password=full_info['password'])
+        wd.close()
+        return result
+    elif task == GET_PROJECT_STATISTIC:
         # анализируем конкретный проект
-        top_viz_url = "https://topvisor.ru/project/dynamics/%s/" % parser_options.pid
-        site_url = None
-        full_info['projects'] = {top_viz_url: site_url}
-        print(full_info)
+        try:
+            project_statistic = dict()
+            project_url = full_info['projects'].keys()[0]
+            site_url = full_info['projects'].items()[0]
+            get_project_statistic(project_url=project_url, site_url=site_url, project_list=project_statistic)
+            return project_statistic
+        except NoSuchElementException:
+            pass
+            #return {'error': 'project not found or access denied'}
+        finally:
+            wd.close()
+    else:
+        return {'error': 'Command not recognized'}
 
-    #get project statistic
-    try:
-        project_statistic = dict()
-        for num in full_info['projects']:
-            get_project_statistic(project_url=num, site_url=full_info['projects'][num], project_list=project_statistic)
 
-        file_name = full_info['login']
-        save_project(project=project_statistic, export_file_name=file_name)
-    except NoSuchElementException:
-        print_log('Element not found')
-        wd.save_screenshot('Error.png')
-    finally:
-        wd.close()
+def onGetTaskParams(gearman_worker, gearman_job):
+    data = json.loads(gearman_job.data)
+    print data
+    result = main_script()
+    return result
 
-# test data for parser
-# --login rafiq@list.ru --pass ump.87uv --debug
-# --debug --datafile project_list_rafiq@list.ru
-# --debug --datafile project_list_rafiq@list.ru --pid 281590
+import gearman, json
+
+gm_worker = gearman.GearmanWorker(['localhost:4730'])
+gm_worker.register_task('SeolibTopVizorGrab_TEST', onGetTaskParams)
+
+# Enter our work loop and call gm_worker.after_poll() after each time we timeout/see socket activity
+gm_worker.work()
 
 parser_options = get_parser_options()
-debug = parser_options.debug
+debug = True # parser_options.debug
 data_file = parser_options.datafile
 # experiments with german
 
-main_script()
+
+
 # load data from file, use --data_file or --login & --password
